@@ -17,6 +17,5 @@ func main() {
     balance, _ := client.GetBalance()
     
     fmt.Println(balance) // 4.77
-
 }
 ```
