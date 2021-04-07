@@ -40,7 +40,7 @@ func NewClient(key string, opts ...ClientOption) (client *Client) {
 	client = &Client{
 		key:           key,
 		client:        http.DefaultClient,
-		timeout:       time.Minute,
+		timeout:       time.Minute * 3,
 		delay:         time.Second * 10,
 		checkInterval: time.Second * 3,
 	}
