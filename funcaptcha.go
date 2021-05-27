@@ -1,6 +1,9 @@
 package anticaptcha
 
-import "net/url"
+import (
+	"context"
+	"net/url"
+)
 
 //FuncaptchaResult is the api response from a funcaptcha task
 type FuncaptchaResult struct {
@@ -8,7 +11,7 @@ type FuncaptchaResult struct {
 }
 
 //Funcaptcha submits and retrieves a funcaptcha task
-func (c *Client) Funcaptcha(siteURL, siteKey, userAgent string, proxy *url.URL, opts ...OptionalValue) (result FuncaptchaResult, err error) {
+func (c *Client) Funcaptcha(ctx context.Context, siteURL, siteKey, userAgent string, proxy *url.URL, opts ...OptionalValue) (result FuncaptchaResult, err error) {
 	var taskId int64
 	data := map[string]interface{}{
 		"type":             "FunCaptchaTask",
@@ -26,12 +29,12 @@ func (c *Client) Funcaptcha(siteURL, siteKey, userAgent string, proxy *url.URL, 
 		return
 	}
 
-	taskId, err = c.createTask(data)
+	taskId, err = c.createTask(ctx, data)
 	if err != nil {
 		return
 	}
 
-	err = c.fetchTask(taskId, &result)
+	err = c.fetchTask(ctx, taskId, &result)
 	if err != nil {
 		return
 	}
@@ -40,7 +43,7 @@ func (c *Client) Funcaptcha(siteURL, siteKey, userAgent string, proxy *url.URL, 
 }
 
 //FuncaptchaProxyless submits and retrieves a funcaptcha task
-func (c *Client) FuncaptchaProxyless(siteURL, siteKey string, opts ...OptionalValue) (result FuncaptchaResult, err error) {
+func (c *Client) FuncaptchaProxyless(ctx context.Context, siteURL, siteKey string, opts ...OptionalValue) (result FuncaptchaResult, err error) {
 	var taskId int64
 	data := map[string]interface{}{
 		"type":             "FunCaptchaTaskProxyless",
@@ -52,12 +55,12 @@ func (c *Client) FuncaptchaProxyless(siteURL, siteKey string, opts ...OptionalVa
 		v(data)
 	}
 
-	taskId, err = c.createTask(data)
+	taskId, err = c.createTask(ctx, data)
 	if err != nil {
 		return
 	}
 
-	err = c.fetchTask(taskId, &result)
+	err = c.fetchTask(ctx, taskId, &result)
 	if err != nil {
 		return
 	}

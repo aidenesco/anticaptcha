@@ -1,6 +1,9 @@
 package anticaptcha
 
-import "net/url"
+import (
+	"context"
+	"net/url"
+)
 
 //HCaptchaResult is the api response from a hcaptcha task
 type HCaptchaResult struct {
@@ -8,7 +11,7 @@ type HCaptchaResult struct {
 }
 
 //HCaptcha submits and retrieves a hcaptcha task
-func (c *Client) HCaptcha(siteURL, siteKey, userAgent string, proxy *url.URL, opts ...OptionalValue) (result HCaptchaResult, err error) {
+func (c *Client) HCaptcha(ctx context.Context, siteURL, siteKey, userAgent string, proxy *url.URL, opts ...OptionalValue) (result HCaptchaResult, err error) {
 	var taskId int64
 	data := map[string]interface{}{
 		"type":       "HCaptchaTask",
@@ -26,12 +29,12 @@ func (c *Client) HCaptcha(siteURL, siteKey, userAgent string, proxy *url.URL, op
 		return
 	}
 
-	taskId, err = c.createTask(data)
+	taskId, err = c.createTask(ctx, data)
 	if err != nil {
 		return
 	}
 
-	err = c.fetchTask(taskId, &result)
+	err = c.fetchTask(ctx, taskId, &result)
 	if err != nil {
 		return
 	}
@@ -40,7 +43,7 @@ func (c *Client) HCaptcha(siteURL, siteKey, userAgent string, proxy *url.URL, op
 }
 
 //HCaptchaProxyless submits and retrieves a hcaptcha task
-func (c *Client) HCaptchaProxyless(siteURL, siteKey string, opts ...OptionalValue) (result HCaptchaResult, err error) {
+func (c *Client) HCaptchaProxyless(ctx context.Context, siteURL, siteKey string, opts ...OptionalValue) (result HCaptchaResult, err error) {
 	var taskId int64
 	data := map[string]interface{}{
 		"type":       "HCaptchaTaskProxyless",
@@ -52,12 +55,12 @@ func (c *Client) HCaptchaProxyless(siteURL, siteKey string, opts ...OptionalValu
 		v(data)
 	}
 
-	taskId, err = c.createTask(data)
+	taskId, err = c.createTask(ctx, data)
 	if err != nil {
 		return
 	}
 
-	err = c.fetchTask(taskId, &result)
+	err = c.fetchTask(ctx, taskId, &result)
 	if err != nil {
 		return
 	}

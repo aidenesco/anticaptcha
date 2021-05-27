@@ -1,5 +1,7 @@
 package anticaptcha
 
+import "context"
+
 //ImageCaptchaResult is the api response from an image task
 type ImageCaptchaResult struct {
 	Text string `json:"text"`
@@ -7,7 +9,7 @@ type ImageCaptchaResult struct {
 }
 
 //ImageToText submits and retrieves an image task
-func (c *Client) ImageToText(body string, opts ...OptionalValue) (result ImageCaptchaResult, err error) {
+func (c *Client) ImageToText(ctx context.Context, body string, opts ...OptionalValue) (result ImageCaptchaResult, err error) {
 	var taskId int64
 	data := map[string]interface{}{
 		"type": "ImageToTextTask",
@@ -18,12 +20,12 @@ func (c *Client) ImageToText(body string, opts ...OptionalValue) (result ImageCa
 		v(data)
 	}
 
-	taskId, err = c.createTask(data)
+	taskId, err = c.createTask(ctx, data)
 	if err != nil {
 		return
 	}
 
-	err = c.fetchTask(taskId, result)
+	err = c.fetchTask(ctx, taskId, result)
 	if err != nil {
 		return
 	}

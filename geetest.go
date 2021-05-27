@@ -1,6 +1,9 @@
 package anticaptcha
 
-import "net/url"
+import (
+	"context"
+	"net/url"
+)
 
 //GeeTestResult is the api response from a geetest task
 type GeeTestResult struct {
@@ -10,7 +13,7 @@ type GeeTestResult struct {
 }
 
 //GeeTest submits and retrieves a geetest task
-func (c *Client) GeeTest(siteURL, siteKey, challenge, userAgent string, proxy *url.URL, opts ...OptionalValue) (result GeeTestResult, err error) {
+func (c *Client) GeeTest(ctx context.Context, siteURL, siteKey, challenge, userAgent string, proxy *url.URL, opts ...OptionalValue) (result GeeTestResult, err error) {
 	var taskId int64
 	data := map[string]interface{}{
 		"type":       "GeeTestTask",
@@ -29,12 +32,12 @@ func (c *Client) GeeTest(siteURL, siteKey, challenge, userAgent string, proxy *u
 		return
 	}
 
-	taskId, err = c.createTask(data)
+	taskId, err = c.createTask(ctx, data)
 	if err != nil {
 		return
 	}
 
-	err = c.fetchTask(taskId, &result)
+	err = c.fetchTask(ctx, taskId, &result)
 	if err != nil {
 		return
 	}
@@ -43,7 +46,7 @@ func (c *Client) GeeTest(siteURL, siteKey, challenge, userAgent string, proxy *u
 }
 
 //GeeTestProxyless submits and retrieves a geetest task
-func (c *Client) GeeTestProxyless(siteURL, siteKey, challenge string, opts ...OptionalValue) (result GeeTestResult, err error) {
+func (c *Client) GeeTestProxyless(ctx context.Context, siteURL, siteKey, challenge string, opts ...OptionalValue) (result GeeTestResult, err error) {
 	var taskId int64
 	data := map[string]interface{}{
 		"type":       "GeeTestTaskProxyless",
@@ -56,12 +59,12 @@ func (c *Client) GeeTestProxyless(siteURL, siteKey, challenge string, opts ...Op
 		v(data)
 	}
 
-	taskId, err = c.createTask(data)
+	taskId, err = c.createTask(ctx, data)
 	if err != nil {
 		return
 	}
 
-	err = c.fetchTask(taskId, &result)
+	err = c.fetchTask(ctx, taskId, &result)
 	if err != nil {
 		return
 	}

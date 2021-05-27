@@ -2,8 +2,10 @@ package anticaptcha
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -17,7 +19,6 @@ const softId = 948
 type Client struct {
 	key           string
 	client        *http.Client
-	timeout       time.Duration
 	delay         time.Duration
 	checkInterval time.Duration
 }
@@ -40,7 +41,6 @@ func NewClient(key string, opts ...ClientOption) (client *Client) {
 	client = &Client{
 		key:           key,
 		client:        http.DefaultClient,
-		timeout:       time.Minute * 3,
 		delay:         time.Second * 10,
 		checkInterval: time.Second * 3,
 	}
@@ -50,13 +50,6 @@ func NewClient(key string, opts ...ClientOption) (client *Client) {
 	}
 
 	return
-}
-
-//WithTimeout is an option that makes the Client use the provided timeout
-func WithTimeout(duration time.Duration) ClientOption {
-	return func(c *Client) {
-		c.timeout = duration
-	}
 }
 
 //WithDelay is an option that makes the Client use the provided delay
@@ -73,7 +66,7 @@ func WithCheckInterval(duration time.Duration) ClientOption {
 	}
 }
 
-func (c *Client) createTask(task interface{}) (taskId int64, err error) {
+func (c *Client) createTask(ctx context.Context, task interface{}) (taskId int64, err error) {
 	data := map[string]interface{}{
 		"clientKey": c.key,
 		"softId":    softId,
@@ -85,7 +78,12 @@ func (c *Client) createTask(task interface{}) (taskId int64, err error) {
 		return
 	}
 
-	resp, err := c.client.Post("https://api.anti-captcha.com/createTask", "application/json", bytes.NewReader(sendBytes))
+	req, err := createRequest(ctx, http.MethodPost, "https://api.anti-captcha.com/createTask", bytes.NewReader(sendBytes))
+	if err != nil {
+		return
+	}
+
+	resp, err := c.client.Do(req)
 	if err != nil {
 		return
 	}
@@ -113,7 +111,7 @@ func (c *Client) createTask(task interface{}) (taskId int64, err error) {
 	}
 
 	if response.ErrorId != 0 {
-		err = errors.New("anticaptcha: " + response.ErrorCode)
+		err = errors.New("anticaptcha: " + response.ErrorDescription)
 		return
 	}
 
@@ -121,7 +119,7 @@ func (c *Client) createTask(task interface{}) (taskId int64, err error) {
 	return
 }
 
-func (c *Client) getTaskResult(taskId int64, dst interface{}) (ready bool, err error) {
+func (c *Client) getTaskResult(ctx context.Context, taskId int64, dst interface{}) (ready bool, err error) {
 	data := map[string]interface{}{
 		"clientKey": c.key,
 		"taskId":    taskId,
@@ -132,7 +130,12 @@ func (c *Client) getTaskResult(taskId int64, dst interface{}) (ready bool, err e
 		return
 	}
 
-	resp, err := c.client.Post("https://api.anti-captcha.com/getTaskResult", "application/json", bytes.NewReader(sendBytes))
+	req, err := createRequest(ctx, http.MethodPost, "https://api.anti-captcha.com/getTaskResult", bytes.NewReader(sendBytes))
+	if err != nil {
+		return
+	}
+
+	resp, err := c.client.Do(req)
 	if err != nil {
 		return
 	}
@@ -165,30 +168,32 @@ func (c *Client) getTaskResult(taskId int64, dst interface{}) (ready bool, err e
 		return
 	}
 
-	if response.Status != "ready" {
+	if response.ErrorId != 0 {
+		ready = false
+		err = errors.New("anticaptcha: " + response.ErrorDescription)
+		return
+	}
+
+	switch response.Status {
+	case "ready":
+		ready = true
+		err = json.Unmarshal(response.Solution, dst)
+		return
+	case "processing":
 		ready = false
 		return
 	}
-
-	ready = true
-
-	err = json.Unmarshal(response.Solution, dst)
-	if err != nil {
-		return
-	}
-
 	return
 }
 
-func (c *Client) fetchTask(taskId int64, dst interface{}) (err error) {
+func (c *Client) fetchTask(ctx context.Context, taskId int64, dst interface{}) (err error) {
+	ticker := time.NewTicker(c.checkInterval)
 	time.Sleep(c.delay)
-	ticker := time.Tick(c.checkInterval)
-	timeout := time.After(c.timeout)
 
 	for {
 		select {
-		case <-ticker:
-			ready, err := c.getTaskResult(taskId, dst)
+		case <-ticker.C:
+			ready, err := c.getTaskResult(ctx, taskId, dst)
 			if err != nil {
 				return err
 			}
@@ -196,15 +201,14 @@ func (c *Client) fetchTask(taskId int64, dst interface{}) (err error) {
 			if ready {
 				return nil
 			}
-		case <-timeout:
-			return errors.New("anticaptcha: timeout exceeded fetching task")
+		case <-ctx.Done():
+			return ctx.Err()
 		}
 	}
-
 }
 
 //GetBalance retrieves the current account balance
-func (c *Client) GetBalance() (balance float64, err error) {
+func (c *Client) GetBalance(ctx context.Context) (balance float64, err error) {
 	data := map[string]interface{}{
 		"clientKey": c.key,
 	}
@@ -214,7 +218,12 @@ func (c *Client) GetBalance() (balance float64, err error) {
 		return
 	}
 
-	resp, err := c.client.Post("https://api.anti-captcha.com/getBalance", "application/json", bytes.NewReader(sendBytes))
+	req, err := createRequest(ctx, http.MethodPost, "https://api.anti-captcha.com/getBalance", bytes.NewReader(sendBytes))
+	if err != nil {
+		return
+	}
+
+	resp, err := c.client.Do(req)
 	if err != nil {
 		return
 	}
@@ -242,7 +251,7 @@ func (c *Client) GetBalance() (balance float64, err error) {
 	}
 
 	if response.ErrorId != 0 {
-		err = errors.New("anticaptcha: " + response.ErrorCode)
+		err = errors.New("anticaptcha: " + response.ErrorDescription)
 		return
 	}
 
@@ -252,7 +261,7 @@ func (c *Client) GetBalance() (balance float64, err error) {
 }
 
 //ReportIncorrectImageCaptcha reports an incorrect captcha for a refund
-func (c *Client) ReportIncorrectImageCaptcha(taskId int64) (err error) {
+func (c *Client) ReportIncorrectImageCaptcha(ctx context.Context, taskId int64) (err error) {
 	data := map[string]interface{}{
 		"clientKey": c.key,
 		"taskId":    taskId,
@@ -263,7 +272,12 @@ func (c *Client) ReportIncorrectImageCaptcha(taskId int64) (err error) {
 		return
 	}
 
-	resp, err := c.client.Post("https://api.anti-captcha.com/reportIncorrectImageCaptcha", "application/json", bytes.NewReader(sendBytes))
+	req, err := createRequest(ctx, http.MethodPost, "https://api.anti-captcha.com/reportIncorrectImageCaptcha", bytes.NewReader(sendBytes))
+	if err != nil {
+		return
+	}
+
+	resp, err := c.client.Do(req)
 	if err != nil {
 		return
 	}
@@ -291,7 +305,7 @@ func (c *Client) ReportIncorrectImageCaptcha(taskId int64) (err error) {
 	}
 
 	if response.ErrorId != 0 {
-		err = errors.New("anticaptcha: " + response.ErrorCode)
+		err = errors.New("anticaptcha: " + response.ErrorDescription)
 		return
 	}
 
@@ -299,7 +313,7 @@ func (c *Client) ReportIncorrectImageCaptcha(taskId int64) (err error) {
 }
 
 //ReportIncorrectRecaptcha reports an incorrect captcha for a refund
-func (c *Client) ReportIncorrectRecaptcha(taskId int64) (err error) {
+func (c *Client) ReportIncorrectRecaptcha(ctx context.Context, taskId int64) (err error) {
 	data := map[string]interface{}{
 		"clientKey": c.key,
 		"taskId":    taskId,
@@ -310,7 +324,12 @@ func (c *Client) ReportIncorrectRecaptcha(taskId int64) (err error) {
 		return
 	}
 
-	resp, err := c.client.Post("https://api.anti-captcha.com/reportIncorrectRecaptcha", "application/json", bytes.NewReader(sendBytes))
+	req, err := createRequest(ctx, http.MethodPost, "https://api.anti-captcha.com/reportIncorrectRecaptcha", bytes.NewReader(sendBytes))
+	if err != nil {
+		return
+	}
+
+	resp, err := c.client.Do(req)
 	if err != nil {
 		return
 	}
@@ -338,7 +357,7 @@ func (c *Client) ReportIncorrectRecaptcha(taskId int64) (err error) {
 	}
 
 	if response.ErrorId != 0 {
-		err = errors.New("anticaptcha: " + response.ErrorCode)
+		err = errors.New("anticaptcha: " + response.ErrorDescription)
 		return
 	}
 
@@ -366,4 +385,16 @@ func addProxyInfo(proxy *url.URL, to map[string]interface{}) error {
 	}
 
 	return nil
+}
+
+func createRequest(ctx context.Context, method, url string, body io.Reader) (r *http.Request, err error) {
+	r, err = http.NewRequestWithContext(ctx, method, url, body)
+	if err != nil {
+		return
+	}
+
+	r.Header.Set("User-Agent", "anticaptcha (github.com/aidenesco/anticaptcha)")
+	r.Header.Set("Content-Type", "application/json")
+
+	return
 }
