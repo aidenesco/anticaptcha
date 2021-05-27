@@ -14,7 +14,7 @@ import "github.com/aidenesco/anticaptcha"
 func main() {
     client := anticaptcha.NewClient("your-key-here")
     
-    balance, _ := client.GetBalance()
+    balance, _ := client.GetBalance(context.Background())
     
     fmt.Println(balance) // 4.77
 }
