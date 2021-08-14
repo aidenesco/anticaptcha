@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -18,6 +19,7 @@ const softId = 948
 //Client allows programmatic access to the anti-captcha api
 type Client struct {
 	key           string
+	host          string
 	client        *http.Client
 	delay         time.Duration
 	checkInterval time.Duration
@@ -45,6 +47,8 @@ func NewClient(key string, opts ...ClientOption) (client *Client) {
 		checkInterval: time.Second * 3,
 	}
 
+	client.host = "api.anti-captcha.com"
+
 	for _, v := range opts {
 		v(client)
 	}
@@ -56,6 +60,13 @@ func NewClient(key string, opts ...ClientOption) (client *Client) {
 func WithDelay(duration time.Duration) ClientOption {
 	return func(c *Client) {
 		c.delay = duration
+	}
+}
+
+//WithHost is an option that makes the Client use the provided host
+func WithHost(host string) ClientOption {
+	return func(c *Client) {
+		c.host = host
 	}
 }
 
@@ -78,7 +89,7 @@ func (c *Client) createTask(ctx context.Context, task interface{}) (taskId int64
 		return
 	}
 
-	req, err := createRequest(ctx, http.MethodPost, "https://api.anti-captcha.com/createTask", bytes.NewReader(sendBytes))
+	req, err := createRequest(ctx, http.MethodPost, fmt.Sprintf("https://%s/createTask", c.host), bytes.NewReader(sendBytes))
 	if err != nil {
 		return
 	}
@@ -130,7 +141,7 @@ func (c *Client) getTaskResult(ctx context.Context, taskId int64, dst interface{
 		return
 	}
 
-	req, err := createRequest(ctx, http.MethodPost, "https://api.anti-captcha.com/getTaskResult", bytes.NewReader(sendBytes))
+	req, err := createRequest(ctx, http.MethodPost, fmt.Sprintf("https://%s/getTaskResult", c.host), bytes.NewReader(sendBytes))
 	if err != nil {
 		return
 	}
@@ -218,7 +229,7 @@ func (c *Client) GetBalance(ctx context.Context) (balance float64, err error) {
 		return
 	}
 
-	req, err := createRequest(ctx, http.MethodPost, "https://api.anti-captcha.com/getBalance", bytes.NewReader(sendBytes))
+	req, err := createRequest(ctx, http.MethodPost, fmt.Sprintf("https://%s/getBalance", c.host), bytes.NewReader(sendBytes))
 	if err != nil {
 		return
 	}
@@ -272,7 +283,7 @@ func (c *Client) ReportIncorrectImageCaptcha(ctx context.Context, taskId int64) 
 		return
 	}
 
-	req, err := createRequest(ctx, http.MethodPost, "https://api.anti-captcha.com/reportIncorrectImageCaptcha", bytes.NewReader(sendBytes))
+	req, err := createRequest(ctx, http.MethodPost, fmt.Sprintf("https://%s/reportIncorrectImageCaptcha", c.host), bytes.NewReader(sendBytes))
 	if err != nil {
 		return
 	}
@@ -324,7 +335,7 @@ func (c *Client) ReportIncorrectRecaptcha(ctx context.Context, taskId int64) (er
 		return
 	}
 
-	req, err := createRequest(ctx, http.MethodPost, "https://api.anti-captcha.com/reportIncorrectRecaptcha", bytes.NewReader(sendBytes))
+	req, err := createRequest(ctx, http.MethodPost, fmt.Sprintf("https://%s/reportIncorrectRecaptcha", c.host), bytes.NewReader(sendBytes))
 	if err != nil {
 		return
 	}
